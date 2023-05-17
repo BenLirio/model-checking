@@ -1,6 +1,7 @@
 module FairDiscreteSystemTest where
 
 import Test.Hspec
+import Control.Exception (evaluate)
 import qualified FairDiscreteSystem as FDS
 import qualified FirstOrderLogic as FOL
 
@@ -11,51 +12,102 @@ import qualified Data.Set as Set
 data Predicate =
     Eq
   | Lt
+  deriving (Eq, Ord)
+
+instance Show Predicate where
+  show Eq = "="
+  show Lt = "<"
+
 data Function =
     Add
+  deriving (Eq, Ord)
+instance Show Function where
+  show Add = "+"
+
 data Symbol =
     Pc
   | X
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
+
 symbols :: Set Symbol
 symbols = Set.fromList [Pc, X]
 
   
 type Constant = Int
 
-simpleFDS :: FDS.FairDiscreteSystem Predicate Symbol Constant Function
-simpleFDS = FDS.FairDiscreteSystem
-  { FDS.variables = Set.fromList
-    [ FDS.Normal Pc
-    , FDS.Prime Pc
-    , FDS.Normal X
-    , FDS.Prime X
-    ]
-  , FDS.initialCondition = FOL.And
-    (FOL.Atomic Eq [FOL.Variable (FDS.Normal Pc), FOL.Constant 0])
-    (FOL.Atomic Eq [FOL.Variable (FDS.Normal X), FOL.Constant 0])
-  , FDS.transitionRelation = FOL.Or
-    (FOL.And
-      (FOL.And
-        (FOL.Atomic Lt [FOL.Variable (FDS.Normal Pc), FOL.Constant 3])
-        (FOL.Atomic Eq [FOL.Variable (FDS.Prime Pc), FOL.Function Add [FOL.Variable (FDS.Normal Pc), FOL.Constant 1] ])
-      )
-      (FOL.Atomic Eq [FOL.Variable (FDS.Prime X), FOL.Function Add [FOL.Variable (FDS.Normal X), FOL.Constant 3] ])
-    )
-    (FOL.And
-      (FOL.And
-        (FOL.Atomic Eq [FOL.Variable (FDS.Normal Pc), FOL.Constant 3])
-        (FOL.Atomic Eq [FOL.Variable (FDS.Prime Pc), FOL.Constant 3])
-      )
-      (FOL.Atomic Eq [FOL.Variable (FDS.Prime X), FOL.Variable (FDS.Normal X)])
-    )
-
-  }
-
-
+type Formula = FOL.Formula Predicate (FDS.PrimedCopy Symbol) Constant Function
+type Term = FOL.Term (FDS.PrimedCopy Symbol) Constant Function
 
 spec :: Spec
 spec = do
+  describe "Formula" $ do
+    it "should show" $ do
+      show
+        ((FOL.And
+          (FOL.Atomic Eq
+            [ FOL.Variable (FDS.Normal X)
+            , FOL.Constant 0
+            ])
+          (FOL.Atomic Eq
+            [ FOL.Variable (FDS.Prime X)
+            , FOL.Function Add 
+              [ FOL.Variable (FDS.Normal X)
+              , FOL.Constant 3
+              ]
+            ]))
+          :: Formula)
+      `shouldBe`
+      "((= X 0) ∧ (= X' (+ X 3)))"
+    it "Should unprime Term" $ do
+      (FDS.unprimeTerm ((FOL.Variable (FDS.Prime X)) :: Term))
+      `shouldBe`
+      (FOL.Variable (FDS.Normal X))
+    it "Should fail to unprime Term" $ do
+      evaluate (FDS.unprimeTerm ((FOL.Variable (FDS.Normal X)) :: Term))
+      `shouldThrow`
+      errorCall "unprimeTerm: variable is not primed"
+    it "Should unprime Formula" $ do
+      (FDS.unprimeFormula (FOL.Atomic Eq
+        [ FOL.Variable (FDS.Prime Pc)
+        , FOL.Function Add 
+          [ FOL.Variable (FDS.Prime X)
+          , FOL.Constant 3
+          ]
+        ]))
+      `shouldBe`
+      (FOL.Atomic Eq
+        [ FOL.Variable (FDS.Normal Pc)
+        , FOL.Function Add 
+          [ FOL.Variable (FDS.Normal X)
+          , FOL.Constant 3
+          ]
+        ])
+    it "Should prime Term" $ do
+      (FDS.primeTerm (FOL.Function Add
+        [ FOL.Variable (FDS.Normal X)
+        , FOL.Constant 3
+        ]))
+      `shouldBe`
+      (FOL.Function Add
+        [ FOL.Variable (FDS.Prime X)
+        , FOL.Constant 3
+        ])
+    it "Should fail to prime Formula" $
+      evaluate (FDS.primeFormula (FOL.Atomic Eq
+        [ FOL.Variable (FDS.Prime Pc)
+        , FOL.Function Add 
+          [ FOL.Variable (FDS.Prime X)
+          , FOL.Constant 3
+          ]
+        ]))
+      `shouldThrow`
+      errorCall "primeFormula: variable is already primed"
+
+
+
+
   describe "FairDiscreteSystem" $ do
     it "should have a test" $ do
       True `shouldBe` True
+    it "checks errors" $ do
+      evaluate (error "foo") `shouldThrow` errorCall "foo"
