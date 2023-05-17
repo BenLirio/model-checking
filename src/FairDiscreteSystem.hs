@@ -1,15 +1,17 @@
 module FairDiscreteSystem where
 
-import PropositionalLogic (Formula)
+import qualified FirstOrderLogic
 
 import Data.Set (Set)
 import qualified Data.Set as Set
 
+data WithPrimedSymbols symbol = 
+    Normal symbol
+  | Prime symbol
+  deriving (Eq, Ord)
 
-data FairDiscreteSystem a = FairDiscreteSystem
-  { variables :: Set a
-  , initialCondition :: Formula
-  , transitionRelation :: Formula
-  , justiceRequirements :: Set Formula
-  , compassionRequirements :: Set (Formula, Formula)
+data FairDiscreteSystem predicate symbol constant function = FairDiscreteSystem
+  { variables :: Set (WithPrimedSymbols symbol)
+  , initialCondition :: FirstOrderLogic.Formula predicate (WithPrimedSymbols symbol) constant function
+  , transitionRelation :: FirstOrderLogic.Formula predicate (WithPrimedSymbols symbol) constant function
   }

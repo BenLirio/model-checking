@@ -2,7 +2,6 @@ import qualified FairDiscreteSystemTest
 import qualified KripkeStructureTest
 
 import Test.Hspec
-import FairDiscreteSystem (FairDiscreteSystem(..))
 
 main :: IO ()
 main = hspec $ do
