@@ -1,0 +1,26 @@
+name: model-checking
+version: 0.1.0.0
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  exposed-modules: KripkeStructure, FairDiscreteSystem, PropositionalLogic
+  build-depends: base, containers
+  hs-source-dirs: src
+  default-language: Haskell2010
+
+executable model-checking-exe
+  main-is:  Main.hs
+  other-modules: KripkeStructure, PropositionalLogic
+  build-depends: base, containers
+  hs-source-dirs: src
+  default-language: Haskell2010
+
+
+test-suite model-checking-test
+  main-is: Main.hs
+  other-modules: FairDiscreteSystemTest, KripkeStructureTest
+  build-depends: base, hspec, model-checking, containers
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  default-language: Haskell2010

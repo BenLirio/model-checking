@@ -3,7 +3,7 @@ module PropositionalLogic where
 type Proposition = String
 
 data Formula =
-  | Atomic Proposition
+    Atomic Proposition
   | Not Formula
   | And Formula Formula
   | Or Formula Formula
