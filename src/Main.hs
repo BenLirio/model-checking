@@ -4,7 +4,7 @@ import qualified Data.Set as Set
 
 kripkeStructure :: KripkeStructure Int
 kripkeStructure = KripkeStructure
-  { atomicPropositions = Set.fromList ["p", "q"]
+  { AtomicPropositions = Set.fromList ["p", "q"]
   , states = Set.fromList [1, 2, 3]
   , initialStates = Set.fromList [1]
   , relation = Set.fromList [(1, 2), (2, 3), (3, 3)]

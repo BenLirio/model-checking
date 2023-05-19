@@ -21,7 +21,7 @@ stopLightKripkeStructure = KripkeStructure
 spec :: Spec
 spec = do
   describe "stopLightKripkeStructure" $ do
-    it "should have three atomic propositions" $ do
+    it "should have three Predicate propositions" $ do
       length (atomicPropositions stopLightKripkeStructure) `shouldBe` 3
     it "should have three states" $ do
       length (states stopLightKripkeStructure) `shouldBe` 3

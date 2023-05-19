@@ -14,6 +14,10 @@ data Predicate =
   | Lt
   deriving (Eq, Ord)
 
+instance FOL.Relatable Predicate where
+  relation Eq = Just FOL.Equal
+  relation Lt = Just FOL.LessThan
+
 instance Show Predicate where
   show Eq = "="
   show Lt = "<"
@@ -21,6 +25,7 @@ instance Show Predicate where
 data Function =
     Add
   deriving (Eq, Ord)
+
 instance Show Function where
   show Add = "+"
 
@@ -44,11 +49,11 @@ spec = do
     it "should show" $ do
       show
         ((FOL.And
-          (FOL.Atomic Eq
+          (FOL.Predicate Eq
             [ FOL.Variable (FDS.Normal X)
             , FOL.Constant 0
             ])
-          (FOL.Atomic Eq
+          (FOL.Predicate Eq
             [ FOL.Variable (FDS.Prime X)
             , FOL.Function Add 
               [ FOL.Variable (FDS.Normal X)
@@ -58,16 +63,8 @@ spec = do
           :: Formula)
       `shouldBe`
       "((= X 0) ∧ (= X' (+ X 3)))"
-    it "Should unprime Term" $ do
-      (FDS.unprimeTerm ((FOL.Variable (FDS.Prime X)) :: Term))
-      `shouldBe`
-      (FOL.Variable (FDS.Normal X))
-    it "Should fail to unprime Term" $ do
-      evaluate (FDS.unprimeTerm ((FOL.Variable (FDS.Normal X)) :: Term))
-      `shouldThrow`
-      errorCall "unprimeTerm: variable is not primed"
     it "Should unprime Formula" $ do
-      (FDS.unprimeFormula (FOL.Atomic Eq
+      (FDS.unprime (FOL.Predicate Eq
         [ FOL.Variable (FDS.Prime Pc)
         , FOL.Function Add 
           [ FOL.Variable (FDS.Prime X)
@@ -75,39 +72,34 @@ spec = do
           ]
         ]))
       `shouldBe`
-      (FOL.Atomic Eq
+      Just (FOL.Predicate Eq
         [ FOL.Variable (FDS.Normal Pc)
         , FOL.Function Add 
           [ FOL.Variable (FDS.Normal X)
           , FOL.Constant 3
           ]
         ])
-    it "Should prime Term" $ do
-      (FDS.primeTerm (FOL.Function Add
-        [ FOL.Variable (FDS.Normal X)
-        , FOL.Constant 3
-        ]))
+    it "Should fail prime Formula" $ do
+      FDS.prime (FOL.Predicate Eq [ FOL.Variable (FDS.Prime Pc) ]) :: Maybe Formula
       `shouldBe`
-      (FOL.Function Add
-        [ FOL.Variable (FDS.Prime X)
-        , FOL.Constant 3
-        ])
-    it "Should fail to prime Formula" $
-      evaluate (FDS.primeFormula (FOL.Atomic Eq
-        [ FOL.Variable (FDS.Prime Pc)
-        , FOL.Function Add 
-          [ FOL.Variable (FDS.Prime X)
-          , FOL.Constant 3
-          ]
+      Nothing
+    it "Should do `post(state, transition)`" $ do
+      (FDS.post
+        (FOL.Predicate Eq
+          [ FOL.Variable (FDS.Normal X)
+          , FOL.Constant 0
+          ])
+        (FOL.And
+          (FOL.Predicate Eq
+            [ FOL.Variable (FDS.Normal X)
+            , FOL.Constant 0
+            ])
+          (FOL.Predicate Eq
+            [ FOL.Variable (FDS.Prime X)
+            , FOL.Constant 1
+            ]))) :: Maybe Formula
+      `shouldBe`
+      (Just (FOL.Predicate Eq
+        [ FOL.Variable (FDS.Normal X)
+        , FOL.Constant 1
         ]))
-      `shouldThrow`
-      errorCall "primeFormula: variable is already primed"
-
-
-
-
-  describe "FairDiscreteSystem" $ do
-    it "should have a test" $ do
-      True `shouldBe` True
-    it "checks errors" $ do
-      evaluate (error "foo") `shouldThrow` errorCall "foo"
