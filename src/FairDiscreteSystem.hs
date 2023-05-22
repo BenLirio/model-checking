@@ -5,6 +5,8 @@ import qualified FirstOrderLogic as FOL
 import Data.Set (Set)
 import qualified Data.Set as Set
 
+import Text.ParserCombinators.ReadP
+
 data PrimedCopy s =
     Prime s
   | Normal s
@@ -12,12 +14,24 @@ data PrimedCopy s =
 instance (Show s) => Show (PrimedCopy s) where
   show (Prime s) = show s ++ "'"
   show (Normal s) = show s
+instance (Read s) => Read (PrimedCopy s) where
+  readsPrec = const $ readP_to_S $ do
+    s <- choice [prime, normal]
+    return s
+    where
+      prime = do
+        s <- readS_to_P reads
+        char '\''
+        return $ Prime s
+      normal = do
+        s <- readS_to_P reads
+        return $ Normal s
 
 
-data FairDiscreteSystem predicate symbol constant function = FairDiscreteSystem
-  { variables :: Set (PrimedCopy symbol)
-  , initialCondition :: FOL.Formula predicate (PrimedCopy symbol) constant function
-  , transitionRelation :: FOL.Formula predicate (PrimedCopy symbol) constant function
+data FairDiscreteSystem predicate variable constant function = FairDiscreteSystem
+  { variables :: Set (PrimedCopy variable)
+  , initialCondition :: FOL.Formula predicate (PrimedCopy variable) constant function
+  , transitionRelation :: FOL.Formula predicate (PrimedCopy variable) constant function
   }
 
 type MapPrimedCopy v = (PrimedCopy v) -> Maybe (PrimedCopy v)
@@ -100,5 +114,21 @@ post state delta =
   unprime (foldl (\formula replacementFunc -> replacementFunc formula) primedPost (zipWith FOL.replaceVariableInFormula unprimedVariables constantTerms)) >>= \unprimedPost ->
   return unprimedPost)
   
-  
-  
+fixedPoint :: (Eq a) => (Maybe a -> Maybe a) -> Maybe a -> Maybe a
+fixedPoint op cur = case op cur of
+  Nothing -> cur
+  Just cur' -> if cur == Just cur' then cur else fixedPoint op (Just cur')
+    
+
+reachability :: (Ord v, FOL.Relatable p, Eq p, Eq c, Eq f) => FairDiscreteSystem p v c f -> Maybe (FOL.Formula p (PrimedCopy v) c f)
+reachability fds = fixedPoint op (Just (initialCondition fds))
+  where
+    op cur = do
+      cur' <- cur
+      next <- post cur' (transitionRelation fds)
+      case FOL.simplify next of
+        FOL.Tautology -> Nothing
+        FOL.Contradiction -> Nothing
+        FOL.Unknown next' -> return next'
+
+

@@ -3,18 +3,48 @@ module FirstOrderLogic where
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Control.Applicative ((<|>))
+import Text.ParserCombinators.ReadP
+
 
 data Term variable constant function =
     Variable variable
   | Constant constant
   | Function function [Term variable constant function]
   deriving (Eq, Ord)
+
 instance (Show variable, Show constant, Show function) => Show (Term variable constant function) where
   show (Variable variable) = show variable
   show (Constant constant) = show constant
-  show (Function function terms) = "(" ++ show function ++ " " ++ termsString ++ ")" where
-    termsString = foldr1 (\term1 term2 -> term1 ++ " " ++ term2) (map show terms)
+  show (Function function []) = "(" ++ show function ++ ")"
+  show (Function function terms) = "(" ++ show function ++ " " ++ termsString ++ ")"
+    where
+    termsString = unwords $ map show terms
+
+
+instance (Read v, Read c, Read f) => Read (Term v c f) where
+  readsPrec = const $ readP_to_S $ do
+    t <- choice [variable, constant, function]
+    return t
+    where
+      variable = do
+        v <- readS_to_P reads
+        return $ Variable v
+      constant = do
+        c <- readS_to_P reads
+        return $ Constant c
+      function = do
+        char '('
+        f <- readS_to_P reads
+        skipSpaces
+        terms <- sepBy (choice [variable, constant, function]) (char ' ')
+        char ')'
+        return $ Function f terms
+
+
+
+
+      
+
 
 data Formula predicate variable constant function =
     Predicate predicate [Term variable constant function]
@@ -48,6 +78,14 @@ instance (Show predicate, Show variable, Show constant, Show function) => Show (
   show (ForAll v f) = "∀" ++ show v ++ ". " ++ show f
   show (ThereExists v f) = "∃" ++ show v ++ ". " ++ show f
 
+(<||>) :: Maybe a -> Maybe a -> Maybe a
+Just x <||> Nothing = Just x
+Nothing <||> Just x = Just x
+Nothing <||> Nothing = Nothing
+Just _ <||> Just _ = Nothing
+
+
+
 
 getConstantEqualityOfVariableInFormula :: (Relatable p, Eq v) => Formula p v c f -> v -> Maybe c
 getConstantEqualityOfVariableInFormula formula x =
@@ -59,7 +97,10 @@ getConstantEqualityOfVariableInFormula formula x =
         _ -> Nothing
       _ -> Nothing
     Not f -> getConstantEqualityOfVariableInFormula f x
-    And f1 f2 -> getConstantEqualityOfVariableInFormula f1 x <|> getConstantEqualityOfVariableInFormula f2 x
+    And f1 f2 -> getConstantEqualityOfVariableInFormula f1 x <||> getConstantEqualityOfVariableInFormula f2 x
+    Or f1 f2 -> getConstantEqualityOfVariableInFormula f1 x <||> getConstantEqualityOfVariableInFormula f2 x
+    Implies f1 f2 -> getConstantEqualityOfVariableInFormula f1 x <||> getConstantEqualityOfVariableInFormula f2 x
+    _ -> Nothing
 
 replaceVariableInTerm :: (Eq v) => v -> Term v c f -> Term v c f -> Term v c f
 replaceVariableInTerm x x' term = case term of
@@ -77,6 +118,40 @@ replaceVariableInFormula x x' formula = case formula of
   Implies f1 f2 -> Implies (replaceVariableInFormula x x' f1) (replaceVariableInFormula x x' f2)
   ForAll y f -> if x == y then formula else ForAll y (replaceVariableInFormula x x' f)
   ThereExists y f -> if x == y then formula else ThereExists y (replaceVariableInFormula x x' f)
+
+data SimplificationResult a =
+    Tautology
+  | Contradiction
+  | Unknown a
+  deriving (Eq, Ord)
+instance (Show a) => Show (SimplificationResult a) where
+  show Tautology = "True"
+  show Contradiction = "False"
+  show (Unknown a) = show a
+
+simplify :: (Relatable p, Eq v, Eq c) => Formula p v c f -> SimplificationResult (Formula p v c f)
+simplify formula = case formula of
+  Predicate p terms -> case relation p of
+    Just Equal -> case terms of
+      [Variable v1, Variable v2] -> if v1 == v2 then Tautology else Unknown formula
+      [Constant c1, Constant c2] -> if c1 == c2 then Tautology else Contradiction
+      _ -> Unknown formula
+    _ -> Unknown formula
+  Not f -> case simplify f of
+    Tautology -> Contradiction
+    Contradiction -> Tautology
+    Unknown f' -> Unknown (Not f')
+  And f1 f2 -> case (simplify f1, simplify f2) of
+    (Contradiction, _) -> Contradiction
+    (_, Contradiction) -> Contradiction
+    (Tautology, Unknown f2') -> Unknown f2'
+    (Unknown f1', Tautology) -> Unknown f1'
+    (Tautology, Tautology) -> Tautology
+  Or f1 f2 -> simplify (Not (And (Not f1) (Not f2)))
+  Implies f1 f2 -> simplify (Or (Not f1) f2)
+  _ -> Unknown formula
+
+
 
 
 
